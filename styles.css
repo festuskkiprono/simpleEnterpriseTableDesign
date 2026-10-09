@@ -429,9 +429,46 @@ th[aria-sort="descending"] {
   .filter-row + .filter-row .field label { position: static; width: auto; height: auto; clip: auto; }
 }
 
-/* Tag on bottom chips showing where a condition came from */
-.chip-tag {
-  display: inline-flex; align-items: center; padding: 0 8px;
-  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
-  background: var(--accent); color: var(--surface);
+/* ---------- Sort builder rows (reuse the filter row look) ---------- */
+.sort-row { grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr) auto; }
+.sort-lead {
+  align-self: end; height: 38px; display: flex; align-items: center;
+  font-size: 12px; font-weight: 600; color: var(--muted);
 }
+.sort-row.applied .sort-lead { color: var(--accent); }
+.sort-priority {
+  display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: var(--accent); color: var(--surface);
+  font-size: 10px; font-weight: 600; letter-spacing: 0;
+}
+
+@media (max-width: 640px) {
+  .sort-row { grid-template-columns: 1fr 1fr; }
+  .sort-lead { grid-column: 1 / -1; height: auto; }
+}
+
+/* ---------- Show / hide columns ---------- */
+.table-toolbar { display: flex; justify-content: flex-end; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.col-menu { position: relative; }
+.col-menu-btn {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  font: inherit; font-weight: 500; color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px;
+}
+.col-menu-btn:hover, .col-menu-btn[aria-expanded="true"] { border-color: var(--accent); }
+.col-menu-btn svg { width: 16px; height: 16px; color: var(--accent); }
+.col-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col-menu-panel {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 200px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .12); padding: 8px; display: grid; gap: 4px; justify-items: start;
+}
+.col-checks { display: grid; gap: 2px; width: 100%; }
+.col-check {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; cursor: pointer;
+}
+.col-check:hover { background: var(--accent-soft); }
+.col-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.col-check.locked { color: var(--muted); cursor: not-allowed; }
+.col-menu-panel .clear-all { padding: 4px 8px; }
+

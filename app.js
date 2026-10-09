@@ -38,12 +38,16 @@ const DATA = [
 const state = {
   filters: [],           // active conditions: [{ id, col, rel, value, source: "search" | "filter" }]
   filterRows: [],        // filter builder rows: [{ id, col, rel, value, filterId }] — filterId set once applied
-  sort: { key: null, dir: "asc" },
-  page: 1,
+  sortRows: [],          // sort builder rows: [{ id, col, dir, applied }] — applied rows, top to bottom, are the sort order
+    hiddenCols: new Set(), // keys of columns the user has hidden
+    page: 1,
   pageSize: 5,
 };
 let nextId = 1;
 let nextRowId = 1;
+let nextSortRowId = 1;
+
+
 
 /* ===== Helpers ===== */
 const $ = id => document.getElementById(id);
@@ -231,21 +235,122 @@ function applyFilters(rows) {
     return TESTS[f.rel](v, q);
   }));
 }
+
+/* ===== Sort builder rows ===== */
+const SORT_ORDERS = [["asc", "Ascending"], ["desc", "Descending"]];
+
+function newSortRow() {
+  return { id: nextSortRowId++, col: COLUMNS[0].key, dir: "asc", applied: false, error: "" };
+}
+function ensureEmptySortRow() {
+  if (!state.sortRows.some(r => !r.applied)) state.sortRows.push(newSortRow());
+}
+
+function renderSortRows() {
+  let level = 0;
+  $("sortRows").innerHTML = state.sortRows.map(r => {
+    const dis = r.applied ? "disabled" : "";
+    const lead = r.applied ? (level++ === 0 ? "Sort by" : "Then by") : (level === 0 ? "Sort by" : "Then by");
+    return `<div class="filter-row sort-row${r.applied ? " applied" : ""}" data-sortrow="${r.id}">
+      <span class="sort-lead">${lead}</span>
+      <div class="field">
+        <label for="scol-${r.id}">Column</label>
+        <select id="scol-${r.id}" data-field="col" ${dis}>
+          ${COLUMNS.map(c => `<option value="${c.key}" ${c.key === r.col ? "selected" : ""}>${c.label}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label for="sdir-${r.id}">Order</label>
+        <select id="sdir-${r.id}" data-field="dir" ${dis}
+          ${r.error ? `aria-invalid="true" aria-describedby="serr-${r.id}"` : ""}>
+          ${SORT_ORDERS.map(([v, l]) => `<option value="${v}" ${v === r.dir ? "selected" : ""}>${l}</option>`).join("")}
+        </select>
+      </div>
+      <div class="row-actions">
+        <button type="button" class="icon-btn add" data-action="add" ${dis}
+          aria-label="${r.applied ? "Sort applied" : "Add sort"}" title="${r.applied ? "Applied" : "Add sort"}">
+          ${r.applied
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`}
+        </button>
+        <button type="button" class="icon-btn bin" data-action="delete" aria-label="Remove sort" title="Remove sort">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+        </button>
+      </div>
+      ${r.error ? `<p class="hint row-hint" id="serr-${r.id}">${esc(r.error)}</p>` : ""}
+    </div>`;
+  }).join("");
+}
+
+$("sortRows").addEventListener("change", e => {
+  const rowEl = e.target.closest("[data-sortrow]");
+  const row = rowEl && state.sortRows.find(r => r.id === Number(rowEl.dataset.sortrow));
+  if (!row) return;
+  const field = e.target.dataset.field;
+  if (field === "col" || field === "dir") {
+    row[field] = e.target.value;
+    if (row.error) { row.error = ""; renderSortRows(); }
+  }
+});
+
+$("sortRows").addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const row = state.sortRows.find(r => r.id === Number(btn.closest("[data-sortrow]").dataset.sortrow));
+
+  if (btn.dataset.action === "add") {
+    // A column can only be sorted once; sorting it twice would be ignored anyway
+    if (sortRules().some(r => r.col === row.col)) {
+      row.error = `Already sorting by ${colOf(row.col).label}. Pick another column, or remove that sort first.`;
+      renderSortRows();
+      return;
+    }
+    row.applied = true; row.error = "";
+    state.sortRows.push(newSortRow());
+    render();
+  }
+
+  if (btn.dataset.action === "delete") {
+    removeSortRow(row.id);
+    render();
+  }
+});
+
+function removeSortRow(rowId) {
+  const row = state.sortRows.find(r => r.id === rowId);
+  if (!row) return;
+  const blanks = state.sortRows.filter(r => !r.applied);
+  if (!row.applied && blanks.length === 1) Object.assign(row, newSortRow(), { id: row.id });   // keep one blank row
+  else state.sortRows = state.sortRows.filter(r => r.id !== rowId);
+  ensureEmptySortRow();
+}
+
+/* Applied sort rows, in priority order. The header arrows and the sort rows both read and write this. */
+const sortRules = () => state.sortRows.filter(r => r.applied);
+
 function applySort(rows) {
-  const { key, dir } = state.sort;
-  if (!key) return rows;
-  const m = dir === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => (a[key] > b[key] ? 1 : a[key] < b[key] ? -1 : 0) * m);
+  const rules = sortRules();
+  if (!rules.length) return rows;
+  return [...rows].sort((a, b) => {
+    for (const { col, dir } of rules) {           // first rule decides; later rules break ties
+      const m = dir === "asc" ? 1 : -1;
+      if (a[col] > b[col]) return m;
+      if (a[col] < b[col]) return -m;
+    }
+    return 0;
+  });
 }
 
 /* ===== Table header with sort arrows ===== */
 function renderHead() {
-  $("headRow").innerHTML = COLUMNS.map(c => {
-    const sorted = state.sort.key === c.key;
-    const aria = sorted ? (state.sort.dir === "asc" ? "ascending" : "descending") : "none";
+  const rules = sortRules();
+  $("headRow").innerHTML = visibleColumns().map(c => {
+    const i = rules.findIndex(r => r.col === c.key);
+    const aria = i === -1 ? "none" : rules[i].dir === "asc" ? "ascending" : "descending";
+    const priority = i !== -1 && rules.length > 1 ? `<span class="sort-priority" title="Sort level ${i + 1}">${i + 1}</span>` : "";
     return `<th class="${c.type === "number" ? "num" : ""}" aria-sort="${aria}">
       <button class="sort-btn" data-key="${c.key}" type="button">
-        ${c.label}
+        ${c.label}${priority}
         <span class="arrows" aria-hidden="true">
           <svg class="up" viewBox="0 0 10 6"><path d="M5 0 10 6H0z"/></svg>
           <svg class="down" viewBox="0 0 10 6"><path d="M0 0h10L5 6z"/></svg>
@@ -257,8 +362,14 @@ $("headRow").addEventListener("click", e => {
   const btn = e.target.closest(".sort-btn");
   if (!btn) return;
   const key = btn.dataset.key;
-  if (state.sort.key === key) state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
-  else state.sort = { key, dir: "asc" };
+  const existing = sortRules().find(r => r.col === key);
+  if (existing) {
+    existing.dir = existing.dir === "asc" ? "desc" : "asc";   // already sorted: flip its direction, keep other levels
+  } else {
+    // Quick sort: a header click on a new column replaces all sort rows with that one column
+    state.sortRows = [{ id: nextSortRowId++, col: key, dir: "asc", applied: true }];
+    ensureEmptySortRow();
+  }
   render();
 });
 
@@ -271,17 +382,14 @@ function render() {
   const pageRows = filtered.slice(start, start + state.pageSize);
 
     renderHead();
-      renderFilterRows();
+    renderFilterRows();
+    renderSortRows();
 
   $("tbody").innerHTML = pageRows.length
-    ? pageRows.map(r => `<tr>
-        <td class="ref">${esc(r.ref)}</td>
-        <td class="desc">${esc(r.description)}</td>
-        <td class="date">${fmtDate(r.date)}</td>
-        <td class="num in">${money(r.moneyIn)}</td>
-        <td class="num out">${money(r.moneyOut)}</td>
-      </tr>`).join("")
-    : `<tr class="empty"><td colspan="${COLUMNS.length}">No transactions match these filters. Remove a filter below to see more.</td></tr>`;
+        ? pageRows.map(r => `<tr>${visibleColumns().map(c => CELL[c.key](r)).join("")}</tr>`).join("")
+    : `<tr class="empty"><td colspan="${visibleColumns().length}">No transactions match these filters. Remove a filter below to see more.</td></tr>`;
+
+  renderColumnMenu();
 
   // Status message
   $("status").innerHTML = state.filters.length
@@ -296,7 +404,15 @@ function render() {
         <span class="k">${k}</span>${esc(v)}<span class="x" aria-hidden="true">×</span></button>`;
         const tag = `<span class="chip-tag" title="${f.source === "search" ? "From the search bar" : "From the filters"}">${f.source === "search" ? "Search" : "Filter"}</span>`;
     return `<span class="chip">${tag}${seg("Column", col.label)}${seg("Relationship", relLabel(col.type, f.rel))}${seg("Value", shownVal)}</span>`;
-  }).join("") + (state.filters.length > 1 ? `<button type="button" class="clear-all" data-clear>Clear all</button>` : "");
+      }).join("") + sortChipsHtml() + hiddenChipsHtml() +
+    (state.filters.length + sortRules().length + state.hiddenCols.size > 1 ? `<button type="button" class="clear-all" data-clear>Clear all</button>` : "");
+
+  // Sort summary, after the filter status
+  const rules = sortRules();
+  if (rules.length) {
+    const words = rules.map(r => `${colOf(r.col).label} (${r.dir === "asc" ? "ascending" : "descending"})`);
+    $("status").insertAdjacentHTML("beforeend", ` Sorted by <strong>${words.join("</strong>, then <strong>")}</strong>.`);
+  }
 
   // Pagination
   $("pageLabel").textContent = `Page ${state.page} of ${totalPages}`;
@@ -314,8 +430,14 @@ $("chips").addEventListener("click", e => {
     else state.filters = state.filters.filter(f => f.id !== id);
     state.page = 1; render();
   }
+  const rmSort = e.target.closest("[data-remove-sort]");
+    if (rmSort) { removeSortRow(Number(rmSort.dataset.removeSort)); render(); }
+      const showCol = e.target.closest("[data-show-col]");
+  if (showCol) { state.hiddenCols.delete(showCol.dataset.showCol); render(); }
   if (e.target.closest("[data-clear]")) {
     state.filters = []; state.filterRows = []; ensureEmptyRow();
+      state.sortRows = []; ensureEmptySortRow();
+    state.hiddenCols.clear();
     state.page = 1; render();
   }
 });
@@ -326,6 +448,67 @@ $("nextBtn").onclick  = () => { state.page++; render(); };
 $("lastBtn").onclick  = () => { state.page = render.totalPages; render(); };
 $("pageSize").onchange = e => { state.pageSize = Number(e.target.value); state.page = 1; render(); };
 
+/* Bottom chips for applied sorts: Column · Order, each with × that removes that sort level */
+function sortChipsHtml() {
+  return sortRules().map(r => {
+    const label = colOf(r.col).label;
+    const order = r.dir === "asc" ? "Ascending" : "Descending";
+    const seg = (k, v) => `<button type="button" data-remove-sort="${r.id}" aria-label="Remove sort ${esc(label)} ${order}">
+        <span class="k">${k}</span>${esc(v)}<span class="x" aria-hidden="true">×</span></button>`;
+    return `<span class="chip chip-sort"><span class="chip-tag">Sort</span>${seg("Column", label)}${seg("Order", order)}</span>`;
+  }).join("");
+}
+/* ===== Show / hide columns ===== */
+const visibleColumns = () => COLUMNS.filter(c => !state.hiddenCols.has(c.key));
+
+/* How each column's cell is drawn. Add an entry here when you add a column to COLUMNS. */
+const CELL = {
+  ref:         r => `<td class="ref">${esc(r.ref)}</td>`,
+  description: r => `<td class="desc">${esc(r.description)}</td>`,
+  date:        r => `<td class="date">${fmtDate(r.date)}</td>`,
+  moneyIn:     r => `<td class="num in">${money(r.moneyIn)}</td>`,
+  moneyOut:    r => `<td class="num out">${money(r.moneyOut)}</td>`,
+};
+
+function renderColumnMenu() {
+  const shown = visibleColumns().length;
+  $("colCount").textContent = `${shown} of ${COLUMNS.length}`;
+  $("colChecks").innerHTML = COLUMNS.map(c => {
+    const visible = !state.hiddenCols.has(c.key);
+    const isLast = visible && shown === 1;              // keep at least one column on screen
+    return `<label class="col-check${isLast ? " locked" : ""}" ${isLast ? 'title="At least one column must stay visible"' : ""}>
+      <input type="checkbox" id="colvis-${c.key}" data-col="${c.key}" ${visible ? "checked" : ""} ${isLast ? "disabled" : ""}>
+      ${c.label}
+    </label>`;
+  }).join("");
+  $("showAllCols").hidden = state.hiddenCols.size === 0;
+}
+
+function setColMenu(open) {
+  $("colMenu").hidden = !open;
+  $("colMenuBtn").setAttribute("aria-expanded", String(open));
+}
+$("colMenuBtn").addEventListener("click", () => setColMenu($("colMenu").hidden));
+$("colChecks").addEventListener("change", e => {
+  const key = e.target.dataset.col;
+  if (!key) return;
+  e.target.checked ? state.hiddenCols.delete(key) : state.hiddenCols.add(key);
+  render();
+  $(`colvis-${key}`).focus();                           // keep focus in the menu after it re-renders
+});
+$("showAllCols").addEventListener("click", () => { state.hiddenCols.clear(); render(); $("colMenuBtn").focus(); });
+// Close the menu on outside click or Escape
+document.addEventListener("click", e => { if (!$("colMenuWrap").contains(e.target)) setColMenu(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("colMenu").hidden) { setColMenu(false); $("colMenuBtn").focus(); } });
+
+/* Bottom chips for hidden columns: × shows the column again */
+function hiddenChipsHtml() {
+  return COLUMNS.filter(c => state.hiddenCols.has(c.key)).map(c =>
+    `<span class="chip chip-hidden"><span class="chip-tag">Hidden</span><button type="button" data-show-col="${c.key}" aria-label="Show column ${esc(c.label)}">
+      <span class="k">Column</span>${esc(c.label)}<span class="x" aria-hidden="true">×</span></button></span>`
+  ).join("");
+}
 initSearchBar();
 ensureEmptyRow();
+ensureEmptySortRow();
 render();

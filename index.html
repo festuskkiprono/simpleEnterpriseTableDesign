@@ -50,6 +50,27 @@
       <div id="filterRows" class="filter-rows"></div>
     </section>
 
+        <!-- Sort builder: one row per sort level. + applies the row, bin removes it -->
+    <section class="filters sorts" aria-labelledby="sortsTitle">
+      <h2 id="sortsTitle" class="filters-title">Sorting</h2>
+      <div id="sortRows" class="filter-rows"></div>
+    </section>
+
+        <!-- Show / hide columns -->
+    <div class="table-toolbar">
+      <div class="col-menu" id="colMenuWrap">
+        <button type="button" class="col-menu-btn" id="colMenuBtn" aria-expanded="false" aria-controls="colMenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>
+          Columns <span class="col-count" id="colCount"></span>
+        </button>
+        <div class="col-menu-panel" id="colMenu" role="group" aria-label="Show or hide columns" hidden>
+          <div id="colChecks" class="col-checks"></div>
+          <button type="button" class="clear-all" id="showAllCols">Show all</button>
+        </div>
+      </div>
+    </div>
+
+
             <div class="table-scroll">
                 <table>
                     <thead>
