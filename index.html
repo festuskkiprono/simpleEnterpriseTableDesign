@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Member Transactions Table</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <div class="wrap">
+        <header>
+            <h1>Member transactions</h1>
+            <p>Sample statement · amounts in KES</p>
+        </header>
+
+        <section class="panel">
+            <!-- Search bar: Column | Relationship | Value | Search -->
+            <form class="search" id="searchForm" novalidate>
+                <div class="field">
+                    <label for="colSelect">Column</label>
+                    <select id="colSelect"></select>
+                </div>
+                <div class="field">
+                    <label for="relSelect">Relationship</label>
+                    <select id="relSelect"></select>
+                </div>
+                <div class="field value">
+                    <label for="valInput">Value</label>
+                    <input id="valInput" autocomplete="off">
+                </div>
+                <button class="search-btn" type="submit" aria-label="Search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                        stroke-linecap="round">
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="m20 20-4-4" />
+                    </svg>
+                    Search
+                </button>
+                <p class="hint" id="hint" hidden></p>
+            </form>
+
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr id="headRow"></tr>
+                    </thead>
+                    <tbody id="tbody"></tbody>
+                </table>
+            </div>
+
+            <div class="foot">
+                <p class="status" id="status" aria-live="polite"></p>
+                <div class="chips" id="chips"></div>
+                <nav class="pager" aria-label="Pagination">
+                    <button id="firstBtn" type="button">« First</button>
+                    <button id="prevBtn" type="button">‹ Prev</button>
+                    <span class="page-label" id="pageLabel"></span>
+                    <button id="nextBtn" type="button">Next ›</button>
+                    <button id="lastBtn" type="button">Last »</button>
+                    <select id="pageSize" class="size" aria-label="Rows per page">
+                        <option value="5">5 / page</option>
+                        <option value="10">10 / page</option>
+                        <option value="25">25 / page</option>
+                    </select>
+                </nav>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
