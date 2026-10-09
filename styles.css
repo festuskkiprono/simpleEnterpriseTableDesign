@@ -394,3 +394,44 @@ th[aria-sort="descending"] {
     padding: 5px 8px;
     margin-left: 8px;
 }
+
+/* ---------- Filter builder rows (between search bar and table) ---------- */
+.filters { padding: 12px 14px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.filters-title {
+  margin: 0; font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.filter-rows { display: grid; gap: 8px; }
+.filter-row {
+  display: grid; gap: 12px; align-items: end;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+}
+.filter-row .field label { font-size: 10px; }
+.filter-row + .filter-row .field label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.filter-row.applied select, .filter-row.applied input {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--fg); opacity: 1;
+}
+.row-actions { display: flex; gap: 8px; align-items: center; height: 38px; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 50%; display: inline-grid; place-items: center;
+  cursor: pointer; padding: 0; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+}
+.icon-btn svg { width: 17px; height: 17px; }
+.icon-btn.add { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.icon-btn.add:hover:not(:disabled) { filter: brightness(1.08); }
+.icon-btn.add:disabled { background: var(--accent-soft); color: var(--accent); cursor: default; }
+.icon-btn.bin:hover { color: var(--out); border-color: var(--out); }
+.row-hint { grid-column: 1 / -1; margin-top: -4px; }
+
+@media (max-width: 640px) {
+  .filter-row { grid-template-columns: 1fr 1fr; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+  .filter-row .field:nth-child(3) { grid-column: 1 / -1; }
+  .filter-row + .filter-row .field label { position: static; width: auto; height: auto; clip: auto; }
+}
+
+/* Tag on bottom chips showing where a condition came from */
+.chip-tag {
+  display: inline-flex; align-items: center; padding: 0 8px;
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+  background: var(--accent); color: var(--surface);
+}
