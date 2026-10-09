@@ -2,104 +2,132 @@
 <html lang="en">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Member Transactions Table</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Member Transactions Table</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
+  <div class="wrap">
+    <header>
+      <h1>Member transactions</h1>
+      <p>Sample statement · amounts in KES</p>
+    </header>
 
-    <div class="wrap">
-        <header>
-            <h1>Member transactions</h1>
-            <p>Sample statement · amounts in KES</p>
-        </header>
+    <section class="panel">
 
-        <section class="panel">
-            <!-- Search bar: Column | Relationship | Value | Search -->
-            <form class="search" id="searchForm" novalidate>
-                <div class="field">
-                    <label for="colSelect">Column</label>
-                    <select id="colSelect"></select>
-                </div>
-                <div class="field">
-                    <label for="relSelect">Relationship</label>
-                    <select id="relSelect"></select>
-                </div>
-                <div class="field value">
-                    <label for="valInput">Value</label>
-                    <input id="valInput" autocomplete="off">
-                </div>
-                <button class="search-btn" type="submit" aria-label="Search">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-                        stroke-linecap="round">
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="m20 20-4-4" />
-                    </svg>
-                    Search
-                </button>
-                <p class="hint" id="hint" hidden></p>
-            </form>
-                <!-- Filter builder: one row per filter. + applies the row, bin removes it -->
-    <section class="filters" aria-labelledby="filtersTitle">
-      <h2 id="filtersTitle" class="filters-title">Filters</h2>
-      <div id="filterRows" class="filter-rows"></div>
-    </section>
-
-        <!-- Sort builder: one row per sort level. + applies the row, bin removes it -->
-    <section class="filters sorts" aria-labelledby="sortsTitle">
-      <h2 id="sortsTitle" class="filters-title">Sorting</h2>
-      <div id="sortRows" class="filter-rows"></div>
-    </section>
-
-        <!-- Show / hide columns -->
-    <div class="table-toolbar">
-      <div class="col-menu" id="colMenuWrap">
-        <button type="button" class="col-menu-btn" id="colMenuBtn" aria-expanded="false" aria-controls="colMenu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>
-          Columns <span class="col-count" id="colCount"></span>
-        </button>
-        <div class="col-menu-panel" id="colMenu" role="group" aria-label="Show or hide columns" hidden>
-          <div id="colChecks" class="col-checks"></div>
-          <button type="button" class="clear-all" id="showAllCols">Show all</button>
+      <!-- Tool buttons: each opens its panel on the right of the table -->
+      <div class="toolbar">
+        <div class="tools" id="tools" role="toolbar" aria-label="Table tools">
+          <button type="button" class="tool-btn" data-tool="search" aria-pressed="false" aria-controls="sidePanel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            Search <span class="badge" id="badgeSearch" hidden></span>
+          </button>
+          <button type="button" class="tool-btn" data-tool="filter" aria-pressed="false" aria-controls="sidePanel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/></svg>
+            Filter <span class="badge" id="badgeFilter" hidden></span>
+          </button>
+          <button type="button" class="tool-btn" data-tool="sort" aria-pressed="false" aria-controls="sidePanel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg>
+            Sort <span class="badge" id="badgeSort" hidden></span>
+          </button>
+          <button type="button" class="tool-btn" data-tool="columns" aria-pressed="false" aria-controls="sidePanel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>
+            Columns <span class="col-count" id="colCount"></span>
+          </button>
         </div>
       </div>
-    </div>
 
+      <!-- Table on the left, chosen tool on the right -->
+      <div class="workspace" id="workspace">
+        <div class="table-area">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr id="headRow"></tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
 
-            <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr id="headRow"></tr>
-                    </thead>
-                    <tbody id="tbody"></tbody>
-                </table>
-            </div>
+        <aside class="side" id="sidePanel" aria-labelledby="sideTitle" hidden>
+          <div class="side-head">
+            <h2 id="sideTitle">Search</h2>
+            <button type="button" class="icon-btn plain" id="closeSide" aria-label="Close panel" title="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
 
-            <div class="foot">
-                <p class="status" id="status" aria-live="polite"></p>
-                <div class="chips" id="chips"></div>
-                <nav class="pager" aria-label="Pagination">
-                    <button id="firstBtn" type="button">« First</button>
-                    <button id="prevBtn" type="button">‹ Prev</button>
-                    <span class="page-label" id="pageLabel"></span>
-                    <button id="nextBtn" type="button">Next ›</button>
-                    <button id="lastBtn" type="button">Last »</button>
-                    <select id="pageSize" class="size" aria-label="Rows per page">
-                        <option value="5">5 / page</option>
-                        <option value="10">10 / page</option>
-                        <option value="25">25 / page</option>
-                    </select>
-                </nav>
-            </div>
-        </section>
-    </div>
+          <!-- Search -->
+          <div data-tool-panel="search" hidden>
+            <p class="side-help">Find transactions where one column matches a value.</p>
+            <form class="search" id="searchForm" novalidate>
+              <div class="field">
+                <label for="colSelect">Column</label>
+                <select id="colSelect"></select>
+              </div>
+              <div class="field">
+                <label for="relSelect">Relationship</label>
+                <select id="relSelect"></select>
+              </div>
+              <div class="field">
+                <label for="valInput">Value</label>
+                <input id="valInput" autocomplete="off">
+              </div>
+              <p class="hint" id="hint" hidden></p>
+              <button class="primary-btn" type="submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                Search
+              </button>
+            </form>
+          </div>
 
-    <script src="app.js"></script>
+          <!-- Filters: + applies a row, bin removes it -->
+          <div data-tool-panel="filter" hidden>
+            <p class="side-help">Every filter must match. Press + to apply a row.</p>
+            <div id="filterRows" class="filter-rows"></div>
+          </div>
+
+          <!-- Sorting: + applies a level, bin removes it -->
+          <div data-tool-panel="sort" hidden>
+            <p class="side-help">The first level sorts the table; later levels break ties.</p>
+            <div id="sortRows" class="filter-rows"></div>
+          </div>
+
+          <!-- Show / hide columns -->
+          <div data-tool-panel="columns" hidden>
+            <p class="side-help">Untick a column to hide it. At least one stays visible.</p>
+            <div id="colChecks" class="col-checks" role="group" aria-label="Show or hide columns"></div>
+            <button type="button" class="clear-all" id="showAllCols">Show all</button>
+          </div>
+        </aside>
+      </div>
+
+      <div class="foot">
+        <p class="status" id="status" aria-live="polite"></p>
+        <div class="chips" id="chips"></div>
+        <nav class="pager" aria-label="Pagination">
+          <button id="firstBtn" type="button">« First</button>
+          <button id="prevBtn" type="button">‹ Prev</button>
+          <span class="page-label" id="pageLabel"></span>
+          <button id="nextBtn" type="button">Next ›</button>
+          <button id="lastBtn" type="button">Last »</button>
+          <select id="pageSize" class="size" aria-label="Rows per page">
+            <option value="5">5 / page</option>
+            <option value="10">10 / page</option>
+            <option value="25">25 / page</option>
+          </select>
+        </nav>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 
 </html>

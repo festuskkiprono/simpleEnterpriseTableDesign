@@ -39,15 +39,14 @@ const state = {
   filters: [],           // active conditions: [{ id, col, rel, value, source: "search" | "filter" }]
   filterRows: [],        // filter builder rows: [{ id, col, rel, value, filterId }] — filterId set once applied
   sortRows: [],          // sort builder rows: [{ id, col, dir, applied }] — applied rows, top to bottom, are the sort order
-    hiddenCols: new Set(), // keys of columns the user has hidden
-    page: 1,
+  hiddenCols: new Set(), // keys of columns the user has hidden
+  tool: null,            // which side panel is open: "search" | "filter" | "sort" | "columns" | null
+  page: 1,
   pageSize: 5,
 };
 let nextId = 1;
 let nextRowId = 1;
 let nextSortRowId = 1;
-
-
 
 /* ===== Helpers ===== */
 const $ = id => document.getElementById(id);
@@ -74,7 +73,7 @@ function initSearchBar() {
       return showHint(`${col.label} needs a number, like 5000.`);
 
     hideHint();
-        state.filters.push({ id: nextId++, col: col.key, rel, value: raw, source: "search" });
+    state.filters.push({ id: nextId++, col: col.key, rel, value: raw, source: "search" });
     state.page = 1;
     $("valInput").value = "";
     render();
@@ -93,7 +92,6 @@ function syncRelationOptions() {
 }
 function showHint(msg) { $("hint").textContent = msg; $("hint").hidden = false; $("valInput").setAttribute("aria-invalid", "true"); $("valInput").focus(); }
 function hideHint() { $("hint").hidden = true; $("valInput").removeAttribute("aria-invalid"); }
-
 
 /* Shared validation for a condition. Returns an error message, or "" when valid. */
 function validateCondition(col, raw) {
@@ -119,19 +117,19 @@ function renderFilterRows() {
     const inputType = col.type === "date" ? "date" : "text";
     const placeholder = col.type === "number" ? "e.g. 30" : col.type === "text" ? "e.g. loan" : "";
     return `<div class="filter-row${applied ? " applied" : ""}" data-row="${r.id}">
-      <div class="field">
+      <div class="field f-col">
         <label for="fcol-${r.id}">Column</label>
         <select id="fcol-${r.id}" data-field="col" ${dis}>
           ${COLUMNS.map(c => `<option value="${c.key}" ${c.key === r.col ? "selected" : ""}>${c.label}</option>`).join("")}
         </select>
       </div>
-      <div class="field">
+      <div class="field f-rel">
         <label for="frel-${r.id}">Rel</label>
         <select id="frel-${r.id}" data-field="rel" ${dis}>
           ${RELATIONS[col.type].map(([v, l]) => `<option value="${v}" ${v === r.rel ? "selected" : ""}>${l}</option>`).join("")}
         </select>
       </div>
-      <div class="field">
+      <div class="field f-val">
         <label for="fval-${r.id}">Value</label>
         <input id="fval-${r.id}" data-field="value" type="${inputType}" inputmode="${col.type === "number" ? "decimal" : "text"}"
           placeholder="${placeholder}" value="${esc(r.value)}" autocomplete="off" ${dis}
@@ -225,17 +223,6 @@ function removeFilterRow(rowId) {
   ensureEmptyRow();
 }
 
-/* ===== Filtering + sorting ===== */
-function applyFilters(rows) {
-  return rows.filter(row => state.filters.every(f => {
-    const col = colOf(f.col);
-    let v = row[f.col], q = f.value;
-    if (col.type === "number") q = Number(q.replace(/,/g, ""));
-    if (col.type === "text") v = String(v);
-    return TESTS[f.rel](v, q);
-  }));
-}
-
 /* ===== Sort builder rows ===== */
 const SORT_ORDERS = [["asc", "Ascending"], ["desc", "Descending"]];
 
@@ -253,13 +240,13 @@ function renderSortRows() {
     const lead = r.applied ? (level++ === 0 ? "Sort by" : "Then by") : (level === 0 ? "Sort by" : "Then by");
     return `<div class="filter-row sort-row${r.applied ? " applied" : ""}" data-sortrow="${r.id}">
       <span class="sort-lead">${lead}</span>
-      <div class="field">
+      <div class="field f-col">
         <label for="scol-${r.id}">Column</label>
         <select id="scol-${r.id}" data-field="col" ${dis}>
           ${COLUMNS.map(c => `<option value="${c.key}" ${c.key === r.col ? "selected" : ""}>${c.label}</option>`).join("")}
         </select>
       </div>
-      <div class="field">
+      <div class="field f-dir">
         <label for="sdir-${r.id}">Order</label>
         <select id="sdir-${r.id}" data-field="dir" ${dis}
           ${r.error ? `aria-invalid="true" aria-describedby="serr-${r.id}"` : ""}>
@@ -325,6 +312,16 @@ function removeSortRow(rowId) {
   ensureEmptySortRow();
 }
 
+/* ===== Filtering + sorting ===== */
+function applyFilters(rows) {
+  return rows.filter(row => state.filters.every(f => {
+    const col = colOf(f.col);
+    let v = row[f.col], q = f.value;
+    if (col.type === "number") q = Number(q.replace(/,/g, ""));
+    if (col.type === "text") v = String(v);
+    return TESTS[f.rel](v, q);
+  }));
+}
 /* Applied sort rows, in priority order. The header arrows and the sort rows both read and write this. */
 const sortRules = () => state.sortRows.filter(r => r.applied);
 
@@ -381,20 +378,21 @@ function render() {
   const start = (state.page - 1) * state.pageSize;
   const pageRows = filtered.slice(start, start + state.pageSize);
 
-    renderHead();
-    renderFilterRows();
-    renderSortRows();
+  renderHead();
+  renderFilterRows();
+  renderSortRows();
 
   $("tbody").innerHTML = pageRows.length
-        ? pageRows.map(r => `<tr>${visibleColumns().map(c => CELL[c.key](r)).join("")}</tr>`).join("")
+    ? pageRows.map(r => `<tr>${visibleColumns().map(c => CELL[c.key](r)).join("")}</tr>`).join("")
     : `<tr class="empty"><td colspan="${visibleColumns().length}">No transactions match these filters. Remove a filter below to see more.</td></tr>`;
 
   renderColumnMenu();
+  renderToolBadges();
 
   // Status message
   $("status").innerHTML = state.filters.length
-    ? `Showing <strong>${filtered.length}</strong> of ${DATA.length} transactions matching ${state.filters.length === 1 ? "this filter" : `all ${state.filters.length} filters`}:`
-    : `Showing all <strong>${DATA.length}</strong> transactions. Use the search bar or filters to narrow them down.`;
+    ? `Showing <strong>${filtered.length}</strong> of ${DATA.length} transactions matching ${state.filters.length === 1 ? "this filter" : `all ${state.filters.length} filters`}.`
+    : `Showing all <strong>${DATA.length}</strong> transactions. Use Search or Filter above the table to narrow them down.`;
 
   // Filter chips: Column · Relationship · Value — each segment has ✕ that removes the filter
   $("chips").innerHTML = state.filters.map(f => {
@@ -402,9 +400,9 @@ function render() {
     const shownVal = col.type === "date" ? fmtDate(f.value) : f.value;
     const seg = (k, v) => `<button type="button" data-remove="${f.id}" aria-label="Remove filter ${esc(col.label)} ${esc(relLabel(col.type, f.rel))} ${esc(shownVal)}">
         <span class="k">${k}</span>${esc(v)}<span class="x" aria-hidden="true">×</span></button>`;
-        const tag = `<span class="chip-tag" title="${f.source === "search" ? "From the search bar" : "From the filters"}">${f.source === "search" ? "Search" : "Filter"}</span>`;
+    const tag = `<span class="chip-tag" title="${f.source === "search" ? "From the search bar" : "From the filters"}">${f.source === "search" ? "Search" : "Filter"}</span>`;
     return `<span class="chip">${tag}${seg("Column", col.label)}${seg("Relationship", relLabel(col.type, f.rel))}${seg("Value", shownVal)}</span>`;
-      }).join("") + sortChipsHtml() + hiddenChipsHtml() +
+  }).join("") + sortChipsHtml() + hiddenChipsHtml() +
     (state.filters.length + sortRules().length + state.hiddenCols.size > 1 ? `<button type="button" class="clear-all" data-clear>Clear all</button>` : "");
 
   // Sort summary, after the filter status
@@ -431,12 +429,12 @@ $("chips").addEventListener("click", e => {
     state.page = 1; render();
   }
   const rmSort = e.target.closest("[data-remove-sort]");
-    if (rmSort) { removeSortRow(Number(rmSort.dataset.removeSort)); render(); }
-      const showCol = e.target.closest("[data-show-col]");
+  if (rmSort) { removeSortRow(Number(rmSort.dataset.removeSort)); render(); }
+  const showCol = e.target.closest("[data-show-col]");
   if (showCol) { state.hiddenCols.delete(showCol.dataset.showCol); render(); }
   if (e.target.closest("[data-clear]")) {
     state.filters = []; state.filterRows = []; ensureEmptyRow();
-      state.sortRows = []; ensureEmptySortRow();
+    state.sortRows = []; ensureEmptySortRow();
     state.hiddenCols.clear();
     state.page = 1; render();
   }
@@ -458,6 +456,7 @@ function sortChipsHtml() {
     return `<span class="chip chip-sort"><span class="chip-tag">Sort</span>${seg("Column", label)}${seg("Order", order)}</span>`;
   }).join("");
 }
+
 /* ===== Show / hide columns ===== */
 const visibleColumns = () => COLUMNS.filter(c => !state.hiddenCols.has(c.key));
 
@@ -472,7 +471,7 @@ const CELL = {
 
 function renderColumnMenu() {
   const shown = visibleColumns().length;
-  $("colCount").textContent = `${shown} of ${COLUMNS.length}`;
+  $("colCount").textContent = `${shown}/${COLUMNS.length}`;
   $("colChecks").innerHTML = COLUMNS.map(c => {
     const visible = !state.hiddenCols.has(c.key);
     const isLast = visible && shown === 1;              // keep at least one column on screen
@@ -484,22 +483,53 @@ function renderColumnMenu() {
   $("showAllCols").hidden = state.hiddenCols.size === 0;
 }
 
-function setColMenu(open) {
-  $("colMenu").hidden = !open;
-  $("colMenuBtn").setAttribute("aria-expanded", String(open));
-}
-$("colMenuBtn").addEventListener("click", () => setColMenu($("colMenu").hidden));
 $("colChecks").addEventListener("change", e => {
   const key = e.target.dataset.col;
   if (!key) return;
   e.target.checked ? state.hiddenCols.delete(key) : state.hiddenCols.add(key);
   render();
-  $(`colvis-${key}`).focus();                           // keep focus in the menu after it re-renders
+  $(`colvis-${key}`).focus();                           // keep focus in the list after it re-renders
 });
-$("showAllCols").addEventListener("click", () => { state.hiddenCols.clear(); render(); $("colMenuBtn").focus(); });
-// Close the menu on outside click or Escape
-document.addEventListener("click", e => { if (!$("colMenuWrap").contains(e.target)) setColMenu(false); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("colMenu").hidden) { setColMenu(false); $("colMenuBtn").focus(); } });
+$("showAllCols").addEventListener("click", () => { state.hiddenCols.clear(); render(); });
+
+/* ===== Tool buttons + side panel ===== */
+const TOOL_TITLES = { search: "Search", filter: "Filters", sort: "Sorting", columns: "Columns" };
+const toolBtn = tool => document.querySelector(`.tool-btn[data-tool="${tool}"]`);
+
+function applyToolPanel() {
+  const t = state.tool;
+  $("sidePanel").hidden = !t;
+  $("workspace").classList.toggle("has-side", Boolean(t));
+  document.querySelectorAll(".tool-btn").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tool === t)));
+  document.querySelectorAll("[data-tool-panel]").forEach(p => { p.hidden = p.dataset.toolPanel !== t; });
+  if (t) $("sideTitle").textContent = TOOL_TITLES[t];
+}
+
+// Clicking a tool opens its panel; clicking the active tool again closes it
+$("tools").addEventListener("click", e => {
+  const btn = e.target.closest(".tool-btn");
+  if (!btn) return;
+  state.tool = state.tool === btn.dataset.tool ? null : btn.dataset.tool;
+  applyToolPanel();
+  if (state.tool) document.querySelector(`[data-tool-panel="${state.tool}"]`).querySelector("input, select, button")?.focus();
+});
+
+function closeToolPanel() {
+  const was = state.tool;
+  state.tool = null;
+  applyToolPanel();
+  if (was) toolBtn(was).focus();
+}
+$("closeSide").addEventListener("click", closeToolPanel);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && state.tool) closeToolPanel(); });
+
+/* Counts on the tool buttons, so active conditions are visible even with the panel closed */
+function renderToolBadges() {
+  const setBadge = (id, n) => { const b = $(id); b.textContent = n; b.hidden = n === 0; };
+  setBadge("badgeSearch", state.filters.filter(f => f.source === "search").length);
+  setBadge("badgeFilter", state.filters.filter(f => f.source === "filter").length);
+  setBadge("badgeSort", sortRules().length);
+}
 
 /* Bottom chips for hidden columns: × shows the column again */
 function hiddenChipsHtml() {
@@ -508,7 +538,9 @@ function hiddenChipsHtml() {
       <span class="k">Column</span>${esc(c.label)}<span class="x" aria-hidden="true">×</span></button></span>`
   ).join("");
 }
+
 initSearchBar();
 ensureEmptyRow();
 ensureEmptySortRow();
+applyToolPanel();
 render();
